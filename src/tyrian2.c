@@ -46,6 +46,7 @@
 #include "sprite.h"
 #include "vga256d.h"
 #include "video.h"
+#include "terminal.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -3251,31 +3252,20 @@ void networkStartScreen(void)
 
 bool titleScreen(void)
 {
-	enum MenuItemIndex
-	{
-		MENU_ITEM_NEW_GAME = 0,
-		MENU_ITEM_LOAD_GAME,
-		MENU_ITEM_HIGH_SCORES,
-		MENU_ITEM_INSTRUCTIONS,
-		MENU_ITEM_SETUP,
-		MENU_ITEM_DEMO,
-		MENU_ITEM_QUIT,
-	};
-
-	SDL_strlcpy(menuText[4], "Setup", sizeof menuText[4]);  // override "Ordering Info"
+	const size_t menu_items_count = 5; // New Game, Load, High, Instr, Demo
 
 	if (shopSpriteSheet.data == NULL)
 		JE_loadCompShapes(&shopSpriteSheet, '1');  // need mouse pointer sprites
 
 	bool restart = true;
 
-	size_t selectedIndex = MENU_ITEM_NEW_GAME;
+	size_t selectedIndex = 0; // MENU_ITEM_NEW_GAME
 	size_t specialNameProgress[SA_ENGAGE] = { 0 };
 
 	const int xCenter = VGAScreen->w / 2;
 	const int yMenuItems = 104;
 	const int hMenuItem = 13;
-	int wMenuItem[COUNTOF(menuText)] = { 0 };
+	int wMenuItem[5] = { 0 };
 
 	for (; ; )
 	{
@@ -3317,27 +3307,32 @@ bool titleScreen(void)
 				fade_palette(colors, 10, 0, 255 - 16);
 			}
 
-			// Draw menu items.
-			for (size_t i = 0; i < COUNTOF(menuText); ++i)
+			// Pre-calculate widths for the 5 active items
+			for (size_t i = 0; i < menu_items_count; ++i)
 			{
-				const char *const text = menuText[i];
-
+				// Skip index 4 (Setup)
+				const char *const text = menuText[i < 4 ? i : i + 1];
 				wMenuItem[i] = JE_textWidth(text, normal_font);
+			}
+
+			// Draw menu items to VGAScreen2 (background layer)
+			for (size_t i = 0; i < menu_items_count; ++i)
+			{
 				const int x = xCenter - wMenuItem[i] / 2;
 				const int y = yMenuItems + hMenuItem * i;
+				const char *const text = menuText[i < 4 ? i : i + 1];
 
-				draw_font_hv(VGAScreen, x - 1, y - 1, menuText[i], normal_font, left_aligned, 15, -10);
-				draw_font_hv(VGAScreen, x + 1, y + 1, menuText[i], normal_font, left_aligned, 15, -10);
-				draw_font_hv(VGAScreen, x + 1, y - 1, menuText[i], normal_font, left_aligned, 15, -10);
-				draw_font_hv(VGAScreen, x - 1, y + 1, menuText[i], normal_font, left_aligned, 15, -10);
-				draw_font_hv(VGAScreen, x,     y,     menuText[i], normal_font, left_aligned, 15, -3);
+				draw_font_hv(VGAScreen, x - 1, y - 1, text, normal_font, left_aligned, 15, -10);
+				draw_font_hv(VGAScreen, x + 1, y + 1, text, normal_font, left_aligned, 15, -10);
+				draw_font_hv(VGAScreen, x + 1, y - 1, text, normal_font, left_aligned, 15, -10);
+				draw_font_hv(VGAScreen, x - 1, y + 1, text, normal_font, left_aligned, 15, -10);
+				draw_font_hv(VGAScreen, x,     y,     text, normal_font, left_aligned, 15, -3);
 			}
 
 			memcpy(VGAScreen2->pixels, VGAScreen->pixels, VGAScreen2->pitch * VGAScreen2->h);
 
 			mouseCursor = MOUSE_POINTER_NORMAL;
 
-			// Fade in menu items.
 			fade_palette(colors, 20, 255 - 16 + 1, 255);
 
 			restart = false;
@@ -3346,7 +3341,10 @@ bool titleScreen(void)
 		memcpy(VGAScreen->pixels, VGAScreen2->pixels, VGAScreen->pitch * VGAScreen->h);
 
 		// Highlight selected menu item.
-		draw_font_hv(VGAScreen, VGAScreen->w / 2, yMenuItems + hMenuItem * selectedIndex, menuText[selectedIndex], normal_font, centered, 15, -1);
+		{
+			const char *const text = menuText[selectedIndex < 4 ? selectedIndex : selectedIndex + 1];
+			draw_font_hv(VGAScreen, VGAScreen->w / 2, yMenuItems + hMenuItem * selectedIndex, text, normal_font, centered, 15, -1);
+		}
 
 		service_SDL_events(true);
 
@@ -3359,11 +3357,9 @@ bool titleScreen(void)
 		bool mouseMoved = false;
 		do
 		{
-			// Play demo after idle for 30 seconds.
 			if (SDL_GetTicks() - idleStartTick > 30000)
 			{
 				fade_black(15);
-
 				play_demo = true;
 				return true;
 			}
@@ -3379,15 +3375,11 @@ bool titleScreen(void)
 			mouseMoved = mouse_x != oldMouseX || mouse_y != oldMouseY;
 		} while (!(newkey || new_text || newmouse || mouseMoved));
 
-		// Handle interaction.
-
 		bool action = false;
-		bool done = false;
 
 		if (mouseMoved || newmouse)
 		{
-			// Find menu item that was hovered or clicked.
-			for (size_t i = 0; i < COUNTOF(menuText); ++i)
+			for (size_t i = 0; i < menu_items_count; ++i)
 			{
 				const int xMenuItem = xCenter - wMenuItem[i] / 2;
 				if (mouse_x >= xMenuItem && mouse_x < xMenuItem + wMenuItem[i])
@@ -3398,66 +3390,44 @@ bool titleScreen(void)
 						if (selectedIndex != i)
 						{
 							JE_playSampleNum(S_CURSOR);
-
 							selectedIndex = i;
 						}
 
-						if (newmouse && lastmouse_but == SDL_BUTTON_LEFT &&
-						    lastmouse_x >= xMenuItem && lastmouse_x < xMenuItem + wMenuItem[i] &&
-						    lastmouse_y >= yMenuItem && lastmouse_y < yMenuItem + hMenuItem)
+						if (newmouse && lastmouse_but == SDL_BUTTON_LEFT)
 						{
 							action = true;
 						}
-
 						break;
 					}
 				}
 			}
 		}
 
-		if (newmouse)
+		if (newmouse && lastmouse_but == SDL_BUTTON_RIGHT)
 		{
-			if (lastmouse_but == SDL_BUTTON_RIGHT)
-			{
-				JE_playSampleNum(S_SPRING);
-
-				done = true;
-			}
+			JE_playSampleNum(S_SPRING);
+			restart = true;
 		}
 		else if (newkey)
 		{
 			switch (lastkey_scan)
 			{
 			case SDL_SCANCODE_UP:
-			{
 				JE_playSampleNum(S_CURSOR);
-
-				selectedIndex = selectedIndex == 0
-					? COUNTOF(menuText) - 1
-					: selectedIndex - 1;
+				selectedIndex = (selectedIndex + menu_items_count - 1) % menu_items_count;
 				break;
-			}
 			case SDL_SCANCODE_DOWN:
-			{
 				JE_playSampleNum(S_CURSOR);
-
-				selectedIndex = selectedIndex == COUNTOF(menuText) - 1
-					? 0
-					: selectedIndex + 1;
+				selectedIndex = (selectedIndex + 1) % menu_items_count;
 				break;
-			}
 			case SDL_SCANCODE_SPACE:
 			case SDL_SCANCODE_RETURN:
-			{
 				action = true;
 				break;
-			}
 			case SDL_SCANCODE_ESCAPE:
-			{
 				JE_playSampleNum(S_SPRING);
-
-				done = true;
-			}
+				restart = true;
+				break;
 			default:
 				break;
 			}
@@ -3468,7 +3438,6 @@ bool titleScreen(void)
 			for (size_t ti = 0U; last_text[ti] != '\0'; ++ti)
 			{
 				const char c = toupper(last_text[ti]);
-
 				for (size_t i = 0; i < SA_ENGAGE; i++)
 				{
 					if (specialNameProgress[i] >= COUNTOF(specialName[i]) - 1 ||
@@ -3477,35 +3446,28 @@ bool titleScreen(void)
 						specialNameProgress[i] = 0;
 						continue;
 					}
-
 					specialNameProgress[i]++;
-
 					if (specialName[i][specialNameProgress[i]] == '\0')
 					{
 						if (i + 1 == SA_DESTRUCT)
 						{
 							fade_black(10);
-
 							loadDestruct = true;
 							return true;
 						}
 						else if (i + 1 == SA_ENGAGE)
 						{
 							JE_playSampleNum(V_DATA_CUBE);
-
 							JE_whoa();
 							set_colors((SDL_Color) { 0, 0, 0 }, 0, 255);
-
 							newSuperTyrianGame();
 							return true;
 						}
 						else
 						{
 							fade_black(10);
-
 							if (newSuperArcadeGame(i))
 								return true;
-
 							restart = true;
 						}
 					}
@@ -3516,79 +3478,30 @@ bool titleScreen(void)
 		if (action)
 		{
 			JE_playSampleNum(S_SELECT);
+			fade_black(15);
 
-			switch (selectedIndex)
+			// Map selectedIndex (0..4) back to original menu indices
+			size_t original_index = (selectedIndex < 4) ? selectedIndex : 5; // 4 was Setup, 5 was Demo
+
+			switch (original_index)
 			{
-			case MENU_ITEM_NEW_GAME:
-			{
-				fade_black(15);
-
-				if (newGame())
-					return true;
-
-				restart = true;
+			case 0: // NEW_GAME
+				if (newGame()) return true;
 				break;
-			}
-			case MENU_ITEM_LOAD_GAME:
-			{
-				fade_black(15);
-
-				if (JE_loadScreen())
-					return true;
-
-				restart = true;
+			case 1: // LOAD_GAME
+				if (JE_loadScreen()) return true;
 				break;
-			}
-			case MENU_ITEM_HIGH_SCORES:
-			{
-				fade_black(15);
-
+			case 2: // HIGH_SCORES
 				JE_highScoreScreen();
-
-				restart = true;
 				break;
-			}
-			case MENU_ITEM_INSTRUCTIONS:
-			{
-				fade_black(15);
-
+			case 3: // INSTRUCTIONS
 				JE_helpSystem(1);
-
-				restart = true;
 				break;
-			}
-			case MENU_ITEM_SETUP:
-			{
-				fade_black(15);
-
-				setupMenu();
-
-				restart = true;
-				break;
-			}
-			case MENU_ITEM_DEMO:
-			{
-				fade_black(15);
-
+			case 5: // DEMO
 				play_demo = true;
 				return true;
 			}
-			case MENU_ITEM_QUIT:
-			{
-				fade_black(15);
-
-				return false;
-			}
-			default:
-				break;
-			}
-		}
-
-		if (done)
-		{
-			fade_black(15);
-
-			return false;
+			restart = true;
 		}
 	}
 }

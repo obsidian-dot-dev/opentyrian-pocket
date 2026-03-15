@@ -607,9 +607,8 @@ void setupMenu(void)
 
 			if (currentMenu == MENU_NONE)
 			{
-				fade_black(10);
-
-				return;
+				currentMenu = MENU_SETUP;
+				restart = true;
 			}
 		}
 		else
@@ -745,14 +744,11 @@ void setupMenu(void)
 	}
 }
 
-int main(int argc, char *argv[])
+int opentyrian_main(int argc, char *argv[])
 {
 	mt_srand(time(NULL));
 
-	printf("\nWelcome to... >> %s %s <<\n\n", opentyrian_str, opentyrian_version);
-
-	printf("Copyright (C) 2022 The OpenTyrian Development Team\n\n");
-
+	printf("\n\nCopyright (C) 2022 The OpenTyrian Development Team\n\n");
 	printf("This program comes with ABSOLUTELY NO WARRANTY.\n");
 	printf("This is free software, and you are welcome to redistribute it\n");
 	printf("under certain conditions.  See the file COPYING for details.\n\n");
@@ -762,14 +758,14 @@ int main(int argc, char *argv[])
 		printf("Failed to initialize SDL: %s\n", SDL_GetError());
 		return -1;
 	}
-
 	JE_loadConfiguration();
 
 	xmas = xmas_time();  // arg handler may override
 
-	JE_paramCheck(argc, argv);
-
+	//!! Don't pass arguments... we don't have a real argc/argv
+	//JE_paramCheck(argc, argv);
 	JE_scanForEpisodes();
+
 
 	init_video();
 	init_keyboard();
@@ -782,6 +778,9 @@ int main(int argc, char *argv[])
 
 		fprintf(stderr, "warning: Christmas is missing.\n");
 	}
+
+
+	printf("\n\nLoad palettes and shape tables...\n\n");
 
 	JE_loadPals();
 	JE_loadMainShapeTables(xmas ? "tyrianc.shp" : "tyrian.shp");
@@ -814,14 +813,15 @@ int main(int argc, char *argv[])
 		printf("audio disabled\n");
 	}
 
+	record_demo = false;
 	if (record_demo)
 		printf("demo recording enabled (input limited to keyboard)\n");
 
+
 	JE_loadExtraShapes();  /*Editship*/
-
 	JE_loadHelpText();
-	/*debuginfo("Help text complete");*/
 
+	isNetworkGame = false;
 	if (isNetworkGame)
 	{
 #ifdef WITH_NETWORK
@@ -862,7 +862,7 @@ int main(int argc, char *argv[])
 			if (!titleScreen())
 			{
 				// Player quit from title screen.
-				break;
+				continue;
 			}
 		}
 
@@ -874,6 +874,7 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
+			printf(" MAIN\n");
 			JE_main();
 
 			if (trentWin)

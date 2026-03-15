@@ -97,6 +97,7 @@ void init_keyboard(void)
 
 	newkey = newmouse = false;
 	keydown = mousedown = false;
+	windowHasFocus = true;
 
 	SDL_ShowCursor(SDL_FALSE);
 
@@ -187,12 +188,12 @@ void service_SDL_events(JE_boolean clear_new)
 				keydown = true;
 
 				mouseInactive = true;
-				return;
+				break;
 
 			case SDL_KEYUP:
 				keysactive[ev.key.keysym.scancode] = 0;
 				keydown = false;
-				return;
+				break;
 
 			case SDL_MOUSEMOTION:
 				mouse_x = ev.motion.x;

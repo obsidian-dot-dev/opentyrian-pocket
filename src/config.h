@@ -176,6 +176,6 @@ void JE_saveGame(JE_byte slot, const char *name);
 void JE_loadGame(JE_byte slot);
 
 void JE_encryptSaveTemp(void);
-void JE_decryptSaveTemp(void);
+JE_boolean JE_decryptSaveTemp(void);
 
 #endif /* CONFIG_H */

@@ -246,58 +246,13 @@ Config opentyrian_config;  // implicitly initialized
 
 bool load_opentyrian_config(void)
 {
-	// defaults
-	fullscreen_display = -1;
-	set_scaler_by_name("Scale2x");
+	// defaults for Pocket
+	fullscreen_display = 0;
+	set_scaler_by_name("None");
+	set_scaling_mode_by_name("Center");
 	memcpy(keySettings, defaultKeySettings, sizeof(keySettings));
 	
-	Config *config = &opentyrian_config;
-	
-	FILE *file = dir_fopen_warn(get_user_directory(), "opentyrian.cfg", "r");
-	if (file == NULL)
-		return false;
-	
-	if (!config_parse(config, file))
-	{
-		fclose(file);
-		
-		return false;
-	}
-	
-	ConfigSection *section;
-	
-	section = config_find_section(config, "video", NULL);
-	if (section != NULL)
-	{
-		config_get_int_option(section, "fullscreen", &fullscreen_display);
-		
-		const char *scaler;
-		if (config_get_string_option(section, "scaler", &scaler))
-			set_scaler_by_name(scaler);
-		
-		const char *scaling_mode;
-		if (config_get_string_option(section, "scaling_mode", &scaling_mode))
-			set_scaling_mode_by_name(scaling_mode);
-	}
-
-	section = config_find_section(config, "keyboard", NULL);
-	if (section != NULL)
-	{
-		for (size_t i = 0; i < COUNTOF(keySettings); ++i)
-		{
-			const char *keyName;
-			if (config_get_string_option(section, keySettingNames[i], &keyName))
-			{
-				SDL_Scancode scancode = SDL_GetScancodeFromName(keyName);
-				if (scancode != SDL_SCANCODE_UNKNOWN)
-					keySettings[i] = scancode;
-			}
-		}
-	}
-
-	fclose(file);
-	
-	return true;
+	return true; // Always return true to satisfy engine
 }
 
 bool save_opentyrian_config(void)
@@ -667,7 +622,7 @@ void JE_encryptSaveTemp(void)
 	}
 }
 
-void JE_decryptSaveTemp(void)
+JE_boolean JE_decryptSaveTemp(void)
 {
 	JE_boolean correct = true;
 	JE_SaveGameTemp s2;
@@ -732,15 +687,16 @@ void JE_decryptSaveTemp(void)
 		printf("Failed XOR'd checksum: %d vs %d\n", saveTemp[SAVE_FILE_SIZE+3], y);
 	}
 
-	/* Barf and die if save file doesn't validate */
+	/* Barf and return failure if save file doesn't validate */
 	if (!correct)
 	{
-		fprintf(stderr, "Error reading save file!\n");
-		exit(255);
+		fprintf(stderr, "Error reading save file! Reinitializing non-volatile storage...\n");
+		return false;
 	}
 
 	/* Keep decrypted version plz */
 	memcpy(&saveTemp, &s2, sizeof(s2));
+	return true;
 }
 
 const char *get_user_directory(void)
@@ -785,6 +741,7 @@ void JE_loadConfiguration(void)
 	int z;
 	JE_byte *p;
 	int y;
+	JE_boolean save_after_init = false;
 	
 	fi = dir_fopen_warn(get_user_directory(), "tyrian.cfg", "rb");
 	if (fi && ftell_eof(fi) == 28)
@@ -818,6 +775,7 @@ void JE_loadConfiguration(void)
 	else
 	{
 		printf("\nInvalid or missing TYRIAN.CFG! Continuing using defaults.\n\n");
+		save_after_init = true;
 		
 		soundEffects = 1;
 		memcpy(&dosKeySettings, &defaultDosKeySettings, sizeof(dosKeySettings));
@@ -825,8 +783,9 @@ void JE_loadConfiguration(void)
 		tyrMusicVolume = 191;
 		fxVolume = 191;
 		gammaCorrection = 0;
-		processorType = 3;
+		processorType = 2;
 		gameSpeed = 4;
+		pentiumMode = false;
 	}
 	
 	load_opentyrian_config();
@@ -844,7 +803,11 @@ void JE_loadConfiguration(void)
 
 		fseek(fi, 0, SEEK_SET);
 		fread_die(saveTemp, 1, sizeof(saveTemp), fi);
-		JE_decryptSaveTemp();
+		if (!JE_decryptSaveTemp())
+		{
+			fclose(fi);
+			goto fresh_save;
+		}
 
 		/* SYN: The original mostly blasted the save file into raw memory. However, our lives are not so
 		   easy, because the C struct is necessarily a different size. So instead we have to loop
@@ -913,6 +876,7 @@ void JE_loadConfiguration(void)
 	}
 	else
 	{
+	fresh_save:
 		/* We didn't have a save file! Let's make up random stuff! */
 		editorLevel = 800;
 
@@ -946,6 +910,9 @@ void JE_loadConfiguration(void)
 	}
 	
 	JE_initProcessorType();
+
+	if (save_after_init)
+		JE_saveConfiguration();
 }
 
 void JE_saveConfiguration(void)

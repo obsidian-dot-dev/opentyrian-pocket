@@ -18,6 +18,9 @@
  */
 #include "mainint.h"
 
+#include <time.h>
+#include <ctype.h>
+
 #include "backgrnd.h"
 #include "config.h"
 #include "editship.h"
@@ -1955,6 +1958,7 @@ void JE_highScoreCheck(void)
 		JE_loadCompShapes(&shopSpriteSheet, '1');  // need mouse pointer sprite
 
 	Sint32 temp_score;
+	char buffer[256];
 
 	for (int temp_p = 0; temp_p < (twoPlayerMode ? 2 : 1); ++temp_p)
 	{
@@ -1996,192 +2000,52 @@ void JE_highScoreCheck(void)
 				strcpy(saveFiles[i].highScoreName, saveFiles[i - 1].highScoreName);
 			}
 
-			wait_noinput(false, true, false);
+			saveFiles[slot].highScore1 = temp_score;
+			strcpy(saveFiles[slot].highScoreName, "POCKET");
+			saveFiles[slot].highScoreDiff = difficultyLevel;
+			JE_saveConfiguration();
 
-			JE_clr256(VGAScreen);
-			JE_showVGA();
-			memcpy(colors, palettes[0], sizeof(colors));
+			fade_black(15);
+			JE_loadPic(VGAScreen, 2, false);
 
-			play_song(33);
+			JE_dString(VGAScreen, JE_fontCenter(miscText[50], FONT_SHAPES), 10, miscText[50], FONT_SHAPES);
+			JE_dString(VGAScreen, JE_fontCenter(episode_name[episodeNum], SMALL_FONT_SHAPES), 35, episode_name[episodeNum], SMALL_FONT_SHAPES);
 
+			for (int i = first_slot; i < slot_limit; ++i)
 			{
-				/* Enter Thy name */
-
-				JE_byte flash = 8 * 16 + 10;
-				JE_boolean fadein = true;
-				JE_boolean quit = false, cancel = false;
-				char stemp[30], tempstr[30];
-				char buffer[256];
-
-				strcpy(stemp, "                             ");
-				temp = 0;
-
-				JE_barShade(VGAScreen, 65, 55, 255, 155);
-
-				do
+				if (i != slot)
 				{
-					service_SDL_events(true);
-
-					JE_dString(VGAScreen, JE_fontCenter(miscText[51], FONT_SHAPES), 3, miscText[51], FONT_SHAPES);
-
-					temp3 = twoPlayerMode ? 58 + p : 53;
-
-					JE_dString(VGAScreen, JE_fontCenter(miscText[temp3-1], SMALL_FONT_SHAPES), 30, miscText[temp3-1], SMALL_FONT_SHAPES);
-
-					blit_sprite(VGAScreenSeg, 50, 50, OPTION_SHAPES, 35);  // message box
-
-					if (twoPlayerMode)
-					{
-						sprintf(buffer, "%s %s", miscText[48 + p], miscText[53]);
-						JE_textShade(VGAScreen, 60, 55, buffer, 11, 4, FULL_SHADE);
-					}
-					else
-					{
-						JE_textShade(VGAScreen, 60, 55, miscText[53], 11, 4, FULL_SHADE);
-					}
-
-					sprintf(buffer, "%s %d", miscText[37], temp_score);
-					JE_textShade(VGAScreen, 70, 70, buffer, 11, 4, FULL_SHADE);
-
-					do
-					{
-						flash = (flash == 8 * 16 + 10) ? 8 * 16 + 2 : 8 * 16 + 10;
-						temp3 = (temp3 == 6) ? 2 : 6;
-
-						strncpy(tempstr, stemp, temp);
-						tempstr[temp] = '\0';
-						JE_outText(VGAScreen, 65, 89, tempstr, 8, 3);
-						tempW = 65 + JE_textWidth(tempstr, TINY_FONT);
-						JE_barShade(VGAScreen, tempW + 2, 90, tempW + 6, 95);
-						fill_rectangle_xy(VGAScreen, tempW + 1, 89, tempW + 5, 94, flash);
-
-						for (int i = 0; i < 14; i++)
-						{
-							setDelay(1);
-
-							JE_mouseStart();
-							JE_showVGA();
-							if (fadein)
-							{
-								fade_palette(colors, 15, 0, 255);
-								fadein = false;
-							}
-							JE_mouseReplace();
-
-							push_joysticks_as_keyboard();
-							service_wait_delay();
-
-							if (newkey || newmouse)
-								break;
-						}
-
-					} while (!newkey && !newmouse && !new_text);
-
-					if (!playing)
-						play_song(31);
-
-					if (mouseButton > 0)
-					{
-						if (mouseX > 56 && mouseX < 142 && mouseY > 123 && mouseY < 149)
-						{
-							quit = true;
-						}
-						else if (mouseX > 151 && mouseX < 237 && mouseY > 123 && mouseY < 149)
-						{
-							quit = true;
-							cancel = true;
-						}
-					}
-					else if (new_text)
-					{
-						for (size_t ti = 0U; last_text[ti] != '\0'; ++ti)
-						{
-							const char c = (unsigned char)last_text[ti] <= 127U ? toupper(last_text[ti]) : 0;
-							if ((c == ' ' || font_ascii[(unsigned char)c] != -1) &&
-							    temp < 28)
-							{
-								stemp[temp] = c;
-								temp += 1;
-							}
-						}
-					}
-					else if (newkey)
-					{
-						switch (lastkey_scan)
-						{
-							case SDL_SCANCODE_BACKSPACE:
-							case SDL_SCANCODE_DELETE:
-								if (temp)
-								{
-									temp--;
-									stemp[temp] = ' ';
-								}
-								break;
-							case SDL_SCANCODE_ESCAPE:
-								quit = true;
-								cancel = true;
-								break;
-							case SDL_SCANCODE_RETURN:
-								quit = true;
-								break;
-							default:
-								break;
-						}
-					}
-				} while (!quit);
-
-				if (!cancel)
-				{
-					saveFiles[slot].highScore1 = temp_score;
-					strcpy(saveFiles[slot].highScoreName, stemp);
-					saveFiles[slot].highScoreDiff = difficultyLevel;
+					sprintf(buffer, "~#%d:~  %d", (i - first_slot + 1), saveFiles[i].highScore1);
+					JE_textShade(VGAScreen,  20, ((i - first_slot + 1) * 12) + 65, buffer, 15, 0, FULL_SHADE);
+					JE_textShade(VGAScreen, 150, ((i - first_slot + 1) * 12) + 65, saveFiles[i].highScoreName, 15, 2, FULL_SHADE);
 				}
-
-				fade_black(15);
-				JE_loadPic(VGAScreen, 2, false);
-
-				JE_dString(VGAScreen, JE_fontCenter(miscText[50], FONT_SHAPES), 10, miscText[50], FONT_SHAPES);
-				JE_dString(VGAScreen, JE_fontCenter(episode_name[episodeNum], SMALL_FONT_SHAPES), 35, episode_name[episodeNum], SMALL_FONT_SHAPES);
-
-				for (int i = first_slot; i < slot_limit; ++i)
-				{
-					if (i != slot)
-					{
-						sprintf(buffer, "~#%d:~  %d", (i - first_slot + 1), saveFiles[i].highScore1);
-						JE_textShade(VGAScreen,  20, ((i - first_slot + 1) * 12) + 65, buffer, 15, 0, FULL_SHADE);
-						JE_textShade(VGAScreen, 150, ((i - first_slot + 1) * 12) + 65, saveFiles[i].highScoreName, 15, 2, FULL_SHADE);
-					}
-				}
-
-				JE_showVGA();
-
-				fade_palette(colors, 15, 0, 255);
-
-				sprintf(buffer, "~#%d:~  %d", (slot - first_slot + 1), saveFiles[slot].highScore1);
-
-				frameCountMax = 6;
-				textGlowFont = TINY_FONT;
-
-				textGlowBrightness = 10;
-				JE_outTextGlow(VGAScreenSeg,  20, (slot - first_slot + 1) * 12 + 65, buffer);
-				textGlowBrightness = 10;
-				JE_outTextGlow(VGAScreenSeg, 150, (slot - first_slot + 1) * 12 + 65, saveFiles[slot].highScoreName);
-				textGlowBrightness = 10;
-				JE_outTextGlow(VGAScreenSeg, JE_fontCenter(miscText[4], TINY_FONT), 180, miscText[4]);
-
-				JE_showVGA();
-
-				if (frameCountMax != 0)
-					wait_input(true, true, true);
-
-				fade_black(15);
 			}
 
+			JE_showVGA();
+
+			fade_palette(colors, 15, 0, 255);
+
+			sprintf(buffer, "~#%d:~  %d", (slot - first_slot + 1), saveFiles[slot].highScore1);
+
+			frameCountMax = 6;
+			textGlowFont = TINY_FONT;
+
+			textGlowBrightness = 10;
+			JE_outTextGlow(VGAScreenSeg,  20, (slot - first_slot + 1) * 12 + 65, buffer);
+			textGlowBrightness = 10;
+			JE_outTextGlow(VGAScreenSeg, 150, (slot - first_slot + 1) * 12 + 65, saveFiles[slot].highScoreName);
+			textGlowBrightness = 10;
+			JE_outTextGlow(VGAScreenSeg, JE_fontCenter(miscText[4], TINY_FONT), 180, miscText[4]);
+
+			JE_showVGA();
+
+			if (frameCountMax != 0)
+				wait_input(true, true, true);
+
+			fade_black(15);
 		}
 	}
 }
-
-// increases game difficulty based on player's total score / total of players' scores
 void adjust_difficulty(void)
 {
 	const float score_multiplier[10] =
@@ -2853,116 +2717,13 @@ void JE_operation(JE_byte slot)
 	}
 	else if (slot % 11 != 0)
 	{
-		strcpy(stemp, "              ");
-		memcpy(stemp, saveFiles[slot-1].name, strlen(saveFiles[slot-1].name));
-		temp = strlen(stemp);
-		while (stemp[temp-1] == ' ' && --temp);
+		// Automate naming for console port (no keyboard)
+		// MUST strictly fit in the 14-character limit of saveFiles[].name 
+		// to prevent overflowing into adjacent struct fields like 'episode'.
+		snprintf(stemp, sizeof(stemp), "POCKET %02d    ", slot % 11);
 
-		flash = 8 * 16 + 10;
-
-		wait_noinput(false, true, false);
-
-		JE_barShade(VGAScreen, 65, 55, 255, 155);
-
-		bool quit = false;
-		while (!quit)
-		{
-			service_SDL_events(true);
-
-			blit_sprite(VGAScreen, 50, 50, OPTION_SHAPES, 35);  // message box
-
-			JE_textShade(VGAScreen, 60, 55, miscText[1-1], 11, 4, DARKEN);
-			JE_textShade(VGAScreen, 70, 70, levelName, 11, 4, DARKEN);
-
-			do
-			{
-				flash = (flash == 8 * 16 + 10) ? 8 * 16 + 2 : 8 * 16 + 10;
-				temp3 = (temp3 == 6) ? 2 : 6;
-
-				strcpy(tempStr, miscText[2-1]);
-				strncat(tempStr, stemp, temp);
-				JE_outText(VGAScreen, 65, 89, tempStr, 8, 3);
-				tempW = 65 + JE_textWidth(tempStr, TINY_FONT);
-				JE_barShade(VGAScreen, tempW + 2, 90, tempW + 6, 95);
-				fill_rectangle_xy(VGAScreen, tempW + 1, 89, tempW + 5, 94, flash);
-
-				int text_x = 54 + 45 - (JE_textWidth(miscText[9], FONT_SHAPES) / 2);
-				JE_outTextAdjust(VGAScreen, text_x, 128, miscText[9], 15, -5, FONT_SHAPES, true);
-
-				text_x = 149 + 45 - (JE_textWidth(miscText[10], FONT_SHAPES) / 2);
-				JE_outTextAdjust(VGAScreen, text_x, 128, miscText[10], 15, -5, FONT_SHAPES, true);
-
-				for (int i = 0; i < 14; i++)
-				{
-					setDelay(1);
-
-					push_joysticks_as_keyboard();
-					service_wait_delay();
-
-					JE_mouseStart();
-					JE_showVGA();
-					JE_mouseReplace();
-
-					if (newkey || newmouse || new_text)
-						break;
-				}
-			} while (!newkey && !newmouse && !new_text);
-
-			if (mouseButton > 0)
-			{
-				if (lastmouse_x > 56 && lastmouse_x < 142 && lastmouse_y > 123 && lastmouse_y < 149)
-				{
-					quit = true;
-					JE_saveGame(slot, stemp);
-					JE_playSampleNum(S_SELECT);
-				}
-				else if (lastmouse_x > 151 && lastmouse_x < 237 && lastmouse_y > 123 && lastmouse_y < 149)
-				{
-					quit = true;
-					JE_playSampleNum(S_SPRING);
-				}
-			}
-			else if (new_text)
-			{
-				for (size_t ti = 0U; last_text[ti] != '\0'; ++ti)
-				{
-					const char c = (unsigned char)last_text[ti] <= 127U ? toupper(last_text[ti]) : 0;
-					if ((c == ' ' || font_ascii[(unsigned char)c] != -1) &&
-					    temp < 14)
-					{
-						JE_playSampleNum(S_CURSOR);
-						stemp[temp] = c;
-						temp += 1;
-					}
-				}
-			}
-			else if (newkey)
-			{
-				switch (lastkey_scan)
-				{
-					case SDL_SCANCODE_BACKSPACE:
-					case SDL_SCANCODE_DELETE:
-						if (temp)
-						{
-							temp--;
-							stemp[temp] = ' ';
-							JE_playSampleNum(S_CLICK);
-						}
-						break;
-					case SDL_SCANCODE_ESCAPE:
-						quit = true;
-						JE_playSampleNum(S_SPRING);
-						break;
-					case SDL_SCANCODE_RETURN:
-						quit = true;
-						JE_saveGame(slot, stemp);
-						JE_playSampleNum(S_SELECT);
-						break;
-					default:
-						break;
-				}
-			}
-		}
+		JE_saveGame(slot, stemp);
+		JE_playSampleNum(S_SELECT);
 	}
 
 	wait_noinput(false, true, false);
