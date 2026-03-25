@@ -18,6 +18,7 @@
  */
 #include "player.h"
 
+__attribute__((section(".fastbss")))
 Player player[2];
 
 void calc_purple_balls_needed(Player *this_player)

@@ -18,6 +18,7 @@
  */
 #include "tyrian2.h"
 
+#include "xmas.h"
 #include "animlib.h"
 #include "backgrnd.h"
 #include "episodes.h"
@@ -70,7 +71,7 @@ JE_word levelEnemy[40]; /* [1..40] */
 char tempStr[31];
 
 /* Data used for ItemScreen procedure to indicate items available */
-JE_byte itemAvail[9][10]; /* [1..9, 1..10] */
+JE_byte itemAvail[9][20]; /* [1..9, 1..20] */
 JE_byte itemAvailMax[9]; /* [1..9] */
 
 void JE_starShowVGA(void)
@@ -1323,12 +1324,12 @@ level_loop:
 		}
 	}
 
-	if (smoothies[0] && processorType > 2 && smoothie_data[0] == 0)
+	if (smoothies[0] && processorType > 2 && processorType != 5 && smoothie_data[0] == 0)
 	{
 		lava_filter(game_screen, VGAScreen);
 		VGAScreen = game_screen;
 	}
-	if (smoothies[2-1] && processorType > 2)
+	if (smoothies[2-1] && processorType > 2 && processorType != 5)
 	{
 		water_filter(game_screen, VGAScreen);
 		VGAScreen = game_screen;
@@ -1348,7 +1349,7 @@ level_loop:
 			stopBackgroundNum = 9;
 	}
 
-	if (smoothies[0] && processorType > 2 && smoothie_data[0] > 0)
+	if (smoothies[0] && processorType > 2 && processorType != 5 && smoothie_data[0] > 0)
 	{
 		lava_filter(game_screen, VGAScreen);
 		VGAScreen = game_screen;
@@ -3250,9 +3251,184 @@ void networkStartScreen(void)
 }
 #endif /* WITH_NETWORK */
 
+bool JE_cheatMenu(void)
+{
+	const size_t cheat_count = 8;
+	const char *cheat_text[] = {
+		"Invincibility",
+		"Rich Mode",
+		"Constant Play",
+		"XMas Mode",
+		"Start SuperTyrian",
+		"Arcade Ships",
+		"Nort Ship",
+		"Back"
+	};
+
+	bool restart = true;
+	size_t selectedIndex = 0;
+
+	const int xCenter = VGAScreen->w / 2;
+	const int yMenuItems = 50;
+	const int hMenuItem = 15;
+
+	for (; ; )
+	{
+		if (restart)
+		{
+			JE_loadPic(VGAScreen2, 4, false); // Reuse title pic
+			draw_font_hv_shadow(VGAScreen2, xCenter, 20, "CHEAT MENU", large_font, centered, 15, -3, false, 2);
+			restart = false;
+		}
+
+		memcpy(VGAScreen->pixels, VGAScreen2->pixels, VGAScreen->pitch * VGAScreen->h);
+
+		for (size_t i = 0; i < cheat_count; ++i)
+		{
+			char buffer[64];
+			const char *status = "";
+			if (i == 0) status = youAreCheating ? " (ON)" : " (OFF)";
+			else if (i == 1) status = richMode ? " (ON)" : " (OFF)";
+			else if (i == 2) status = constantPlay ? " (ON)" : " (OFF)";
+			else if (i == 3) status = xmas ? " (ON)" : " (OFF)";
+
+			snprintf(buffer, sizeof(buffer), "%s%s", cheat_text[i], status);
+			
+			int color = (i == selectedIndex) ? 15 : 13;
+			int shadow = (i == selectedIndex) ? -1 : -3;
+			draw_font_hv_shadow(VGAScreen, xCenter, yMenuItems + i * hMenuItem, buffer, normal_font, centered, color, shadow, false, 1);
+		}
+
+		service_SDL_events(true);
+		JE_showVGA();
+
+		push_joysticks_as_keyboard();
+		service_SDL_events(false);
+
+		if (newkey)
+		{
+			switch (lastkey_scan)
+			{
+			case SDL_SCANCODE_UP:
+				selectedIndex = (selectedIndex + cheat_count - 1) % cheat_count;
+				break;
+			case SDL_SCANCODE_DOWN:
+				selectedIndex = (selectedIndex + 1) % cheat_count;
+				break;
+			case SDL_SCANCODE_SPACE:
+			case SDL_SCANCODE_RETURN:
+				switch (selectedIndex)
+				{
+				case 0: youAreCheating = !youAreCheating; break;
+				case 1: richMode = !richMode; break;
+				case 2: constantPlay = !constantPlay; break;
+				case 3: xmas = !xmas; break;
+				case 4: // SuperTyrian
+					fade_black(10);
+					newSuperTyrianGame();
+					return true;
+				case 5: // Arcade Ships Sub-menu
+					{
+						size_t shipIdx = 0;
+						bool ship_done = false;
+						while (!ship_done)
+						{
+							memcpy(VGAScreen->pixels, VGAScreen2->pixels, VGAScreen->pitch * VGAScreen->h);
+							draw_font_hv_shadow(VGAScreen, xCenter, 40, "SELECT ARCADE SHIP", normal_font, centered, 15, -3, false, 1);
+							for (size_t j = 0; j < SA_ENGAGE - 1; j++)
+							{
+								int color = (j == shipIdx) ? 15 : 13;
+								draw_font_hv_shadow(VGAScreen, xCenter, 60 + j * 12, specialName[j], small_font, centered, color, -1, false, 1);
+							}
+							service_SDL_events(true);
+							JE_showVGA();
+							push_joysticks_as_keyboard();
+							service_SDL_events(false);
+							if (newkey)
+							{
+								if (lastkey_scan == SDL_SCANCODE_UP) shipIdx = (shipIdx + SA_ENGAGE - 2) % (SA_ENGAGE - 1);
+								else if (lastkey_scan == SDL_SCANCODE_DOWN) shipIdx = (shipIdx + 1) % (SA_ENGAGE - 1);
+								else if (lastkey_scan == SDL_SCANCODE_RETURN || lastkey_scan == SDL_SCANCODE_SPACE)
+								{
+									// Ship selected! Now ask for game mode.
+									size_t modeIdx = 0;
+									bool mode_done = false;
+									while (!mode_done)
+									{
+										memcpy(VGAScreen->pixels, VGAScreen2->pixels, VGAScreen->pitch * VGAScreen->h);
+										draw_font_hv_shadow(VGAScreen, xCenter, 40, "SELECT GAME MODE", normal_font, centered, 15, -3, false, 1);
+										
+										int col0 = (modeIdx == 0) ? 15 : 13;
+										int col1 = (modeIdx == 1) ? 15 : 13;
+										draw_font_hv_shadow(VGAScreen, xCenter, 70, "FULL GAME", normal_font, centered, col0, -1, false, 1);
+										draw_font_hv_shadow(VGAScreen, xCenter, 90, "ARCADE MODE", normal_font, centered, col1, -1, false, 1);
+										
+										service_SDL_events(true);
+										JE_showVGA();
+										push_joysticks_as_keyboard();
+										service_SDL_events(false);
+										
+										if (newkey)
+										{
+											if (lastkey_scan == SDL_SCANCODE_UP || lastkey_scan == SDL_SCANCODE_DOWN) modeIdx = !modeIdx;
+											else if (lastkey_scan == SDL_SCANCODE_RETURN || lastkey_scan == SDL_SCANCODE_SPACE)
+											{
+												fade_black(10);
+												if (modeIdx == 0) // Full Game
+												{
+													player[0].items.ship = SAShip[shipIdx];
+													player[0].items.weapon[FRONT_WEAPON].id = SAWeapon[shipIdx][0];
+													player[0].items.weapon[REAR_WEAPON].id = 0;
+													player[0].items.special = SASpecialWeapon[shipIdx];
+													
+													if (SAShip[shipIdx] == 12) // NortShip Z
+													{
+														player[0].items.weapon[REAR_WEAPON].id = 37;
+														player[0].items.weapon[FRONT_WEAPON].id = 36;
+														for (uint i = 0; i < COUNTOF(player[0].items.sidekick); ++i)
+															player[0].items.sidekick[i] = 24; // Companion Ship Quicksilver
+													}
+													
+													if (newGame(true)) return true;
+												}
+												else // Arcade Mode
+												{
+													if (newSuperArcadeGame(shipIdx, false)) return true;
+												}
+												restart = true; mode_done = true; ship_done = true;
+											}
+											else if (lastkey_scan == SDL_SCANCODE_ESCAPE) mode_done = true;
+										}
+										SDL_Delay(16);
+									}
+								}
+								else if (lastkey_scan == SDL_SCANCODE_ESCAPE) ship_done = true;
+							}
+							SDL_Delay(16);
+						}
+					}
+					break;
+				case 6: // Nort Ship (instantly)
+					player[0].items.ship = 12;
+					player[0].items.special = 13;
+					player[0].items.weapon[FRONT_WEAPON].id = 36;
+					player[0].items.weapon[REAR_WEAPON].id = 37;
+					shipGr = 1;
+					break;
+				case 7: return false; // Back
+				}
+				break;
+			case SDL_SCANCODE_ESCAPE:
+				return false;
+			}
+		}
+		SDL_Delay(16);
+	}
+}
+
 bool titleScreen(void)
 {
-	const size_t menu_items_count = 5; // New Game, Load, High, Instr, Demo
+	const size_t menu_items_count = 6; // New Game, Load, High, Instr, Cheats, Demo
 
 	if (shopSpriteSheet.data == NULL)
 		JE_loadCompShapes(&shopSpriteSheet, '1');  // need mouse pointer sprites
@@ -3263,9 +3439,9 @@ bool titleScreen(void)
 	size_t specialNameProgress[SA_ENGAGE] = { 0 };
 
 	const int xCenter = VGAScreen->w / 2;
-	const int yMenuItems = 104;
+	const int yMenuItems = 104 - 10; // Shift up slightly for more items
 	const int hMenuItem = 13;
-	int wMenuItem[5] = { 0 };
+	int wMenuItem[6] = { 0 };
 
 	for (; ; )
 	{
@@ -3307,11 +3483,13 @@ bool titleScreen(void)
 				fade_palette(colors, 10, 0, 255 - 16);
 			}
 
-			// Pre-calculate widths for the 5 active items
+			// Pre-calculate widths for the items
 			for (size_t i = 0; i < menu_items_count; ++i)
 			{
-				// Skip index 4 (Setup)
-				const char *const text = menuText[i < 4 ? i : i + 1];
+				const char *text;
+				if (i < 4) text = menuText[i];
+				else if (i == 4) text = "CHEATS";
+				else text = menuText[5]; // Demo
 				wMenuItem[i] = JE_textWidth(text, normal_font);
 			}
 
@@ -3320,7 +3498,10 @@ bool titleScreen(void)
 			{
 				const int x = xCenter - wMenuItem[i] / 2;
 				const int y = yMenuItems + hMenuItem * i;
-				const char *const text = menuText[i < 4 ? i : i + 1];
+				const char *text;
+				if (i < 4) text = menuText[i];
+				else if (i == 4) text = "CHEATS";
+				else text = menuText[5];
 
 				draw_font_hv(VGAScreen, x - 1, y - 1, text, normal_font, left_aligned, 15, -10);
 				draw_font_hv(VGAScreen, x + 1, y + 1, text, normal_font, left_aligned, 15, -10);
@@ -3342,7 +3523,10 @@ bool titleScreen(void)
 
 		// Highlight selected menu item.
 		{
-			const char *const text = menuText[selectedIndex < 4 ? selectedIndex : selectedIndex + 1];
+			const char *text;
+			if (selectedIndex < 4) text = menuText[selectedIndex];
+			else if (selectedIndex == 4) text = "CHEATS";
+			else text = menuText[5];
 			draw_font_hv(VGAScreen, VGAScreen->w / 2, yMenuItems + hMenuItem * selectedIndex, text, normal_font, centered, 15, -1);
 		}
 
@@ -3466,7 +3650,7 @@ bool titleScreen(void)
 						else
 						{
 							fade_black(10);
-							if (newSuperArcadeGame(i))
+							if (newSuperArcadeGame(i, false))
 								return true;
 							restart = true;
 						}
@@ -3478,26 +3662,30 @@ bool titleScreen(void)
 		if (action)
 		{
 			JE_playSampleNum(S_SELECT);
-			fade_black(15);
 
-			// Map selectedIndex (0..4) back to original menu indices
-			size_t original_index = (selectedIndex < 4) ? selectedIndex : 5; // 4 was Setup, 5 was Demo
-
-			switch (original_index)
+			switch (selectedIndex)
 			{
 			case 0: // NEW_GAME
-				if (newGame()) return true;
+				fade_black(15);
+				if (newGame(false)) return true;
 				break;
 			case 1: // LOAD_GAME
+				fade_black(15);
 				if (JE_loadScreen()) return true;
 				break;
 			case 2: // HIGH_SCORES
+				fade_black(15);
 				JE_highScoreScreen();
 				break;
 			case 3: // INSTRUCTIONS
+				fade_black(15);
 				JE_helpSystem(1);
 				break;
+			case 4: // CHEATS
+				if (JE_cheatMenu()) return true;
+				break;
 			case 5: // DEMO
+				fade_black(15);
 				play_demo = true;
 				return true;
 			}
@@ -3506,11 +3694,11 @@ bool titleScreen(void)
 	}
 }
 
-bool newGame(void)
+bool newGame(bool bypass_select)
 {
-	if (gameplaySelect())
+	if (bypass_select || gameplaySelect())
 	{
-		if (episodeSelect() && difficultySelect())
+		if (bypass_select || (episodeSelect() && difficultySelect()))
 			gameLoaded = true;
 
 		initialDifficulty = difficultyLevel;
@@ -3519,7 +3707,9 @@ bool newGame(void)
 		{
 			player[0].cash = 0;
 
-			player[0].items.ship = 8;  // Stalker
+			// Only set default ship if it hasn't been "smuggled" from the cheat menu
+			if (player[0].items.ship == 0 || player[0].items.ship == 8)
+				player[0].items.ship = 8;  // Stalker
 		}
 		else if (twoPlayerMode)
 		{
@@ -3546,17 +3736,26 @@ bool newGame(void)
 			assert(episodeNum >= 1 && episodeNum <= EPISODE_AVAILABLE);
 			player[0].cash = initial_cash[episodeNum - 1];
 		}
+		
+		if (gameLoaded)
+			player[0].last_items = player[0].items;
 	}
 
 	return gameLoaded;
 }
 
-bool newSuperArcadeGame(unsigned int i)
+bool newSuperArcadeGame(unsigned int i, bool autoSelect)
 {
 	player[0].items.ship = SAShip[i];
 
-	if (episodeSelect() && difficultySelect())
+	if (autoSelect || (episodeSelect() && difficultySelect()))
 	{
+		if (autoSelect)
+		{
+			episodeNum = 1;
+			JE_initEpisode(episodeNum);
+		}
+
 		/* Start special mode! */
 		JE_loadPic(VGAScreen, 1, false);
 		JE_clr256(VGAScreen);

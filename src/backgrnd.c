@@ -60,6 +60,7 @@ void JE_darkenBackground(JE_word neat)  /* wild detail level */
 	}
 }
 
+__attribute__((section(".fasttext")))
 void blit_background_row(SDL_Surface *surface, int x, int y, Uint8 **map)
 {
 	assert(surface->format->BitsPerPixel == 8);
@@ -106,6 +107,7 @@ void blit_background_row(SDL_Surface *surface, int x, int y, Uint8 **map)
 	}
 }
 
+__attribute__((section(".fasttext")))
 void blit_background_row_blend(SDL_Surface *surface, int x, int y, Uint8 **map)
 {
 	assert(surface->format->BitsPerPixel == 8);
@@ -254,6 +256,7 @@ void draw_background_3(SDL_Surface *surface)
 	}
 }
 
+__attribute__((section(".fasttext")))
 void JE_filterScreen(JE_shortint col, JE_shortint int_)
 {
 	Uint8 *s = NULL; /* screen pointer, 8-bit specific */
@@ -314,30 +317,50 @@ void JE_filterScreen(JE_shortint col, JE_shortint int_)
 
 void JE_checkSmoothies(void)
 {
-	anySmoothies = (processorType > 2 && (smoothies[1-1] || smoothies[2-1])) || (processorType > 1 && (smoothies[3-1] || smoothies[4-1] || smoothies[5-1]));
+	anySmoothies = (processorType > 2 && processorType != 5 && (smoothies[1-1] || smoothies[2-1])) || 
+	               (processorType > 1 && (smoothies[3-1] || smoothies[4-1] || smoothies[5-1]));
 }
 
-void lava_filter(SDL_Surface *dst, SDL_Surface *src)
+__attribute__((section(".fasttext")))
+static void fast_lava_filter(SDL_Surface *dst, SDL_Surface *src)
 {
-	assert(src->format->BitsPerPixel == 8 && dst->format->BitsPerPixel == 8);
+	uint32_t *d32 = (uint32_t *)dst->pixels;
+	const uint32_t *s32 = (const uint32_t *)src->pixels;
+	int n = (320 * 185) / 4;
 	
-	/* we don't need to check for over-reading the pixel surfaces since we only
-	 * read from the top 185+1 scanlines, and there should be 320 */
-	
+	while (n >= 4) {
+		uint32_t s0 = s32[0], d0 = d32[0];
+		uint32_t s1 = s32[1], d1 = d32[1];
+		uint32_t s2 = s32[2], d2 = d32[2];
+		uint32_t s3 = s32[3], d3 = d32[3];
+		d32[0] = ((((s0 & 0x0F0F0F0F) + (d0 & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | 0x70707070;
+		d32[1] = ((((s1 & 0x0F0F0F0F) + (d1 & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | 0x70707070;
+		d32[2] = ((((s2 & 0x0F0F0F0F) + (d2 & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | 0x70707070;
+		d32[3] = ((((s3 & 0x0F0F0F0F) + (d3 & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | 0x70707070;
+		s32 += 4; d32 += 4; n -= 4;
+	}
+	while (n--) {
+		uint32_t s = *s32++, d = *d32;
+		*d32++ = ((((s & 0x0F0F0F0F) + (d & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | 0x70707070;
+	}
+}
+
+static void original_lava_filter(SDL_Surface *dst, SDL_Surface *src)
+{
 	const int dst_pitch = dst->pitch;
 	Uint8 *dst_pixel = (Uint8 *)dst->pixels + (185 * dst_pitch);
-	const Uint8 * const dst_pixel_ll = (Uint8 *)dst->pixels;  // lower limit
+	const Uint8 * const dst_pixel_ll = (Uint8 *)dst->pixels;
 	
 	const int src_pitch = src->pitch;
 	const Uint8 *src_pixel = (Uint8 *)src->pixels + (185 * src->pitch);
-	const Uint8 * const src_pixel_ll = (Uint8 *)src->pixels;  // lower limit
+	const Uint8 * const src_pixel_ll = (Uint8 *)src->pixels;
 	
 	int w = 320 * 185 - 1;
 	
 	for (int y = 185 - 1; y >= 0; --y)
 	{
-		dst_pixel -= (dst_pitch - 320);  // in case pitch is not 320
-		src_pixel -= (src_pitch - 320);  // in case pitch is not 320
+		dst_pixel -= (dst_pitch - 320);
+		src_pixel -= (src_pitch - 320);
 		
 		for (int x = 320 - 1; x >= 0; x -= 8)
 		{
@@ -349,8 +372,6 @@ void lava_filter(SDL_Surface *dst, SDL_Surface *src)
 				--dst_pixel;
 				--src_pixel;
 				
-				// value is average value of source pixel (2x), destination pixel above, and destination pixel below (all with waver)
-				// hue is red
 				Uint8 value = 0;
 				
 				if (src_pixel + waver >= src_pixel_ll)
@@ -365,26 +386,57 @@ void lava_filter(SDL_Surface *dst, SDL_Surface *src)
 	}
 }
 
-void water_filter(SDL_Surface *dst, SDL_Surface *src)
+void lava_filter(SDL_Surface *dst, SDL_Surface *src)
 {
 	assert(src->format->BitsPerPixel == 8 && dst->format->BitsPerPixel == 8);
+	original_lava_filter(dst, src);
+}
+
+__attribute__((section(".fasttext")))
+static void fast_water_filter(SDL_Surface *dst, SDL_Surface *src)
+{
+	uint32_t hue = smoothie_data[1] << 4;
+	uint32_t hue32 = hue | (hue << 8) | (hue << 16) | (hue << 24);
 	
+	uint32_t *d32 = (uint32_t *)dst->pixels;
+	const uint32_t *s32 = (const uint32_t *)src->pixels;
+	int n = (320 * 185) / 4;
+	
+	/* 100% Branchless 32-bit water filter. 
+	 * Eliminates conditional jumps that flush the CPU pipeline. */
+	while (n--) {
+		uint32_t s = *s32++;
+		
+		/* Isolate the bits we care about: 0x30 in each byte */
+		uint32_t check = s & 0x30303030;
+		
+		/* Shift down so the relevant bits are at the bottom of each byte */
+		uint32_t c_or = ((check >> 4) | (check >> 5)) & 0x01010101;
+		
+		/* Multiply by 255 to expand 0x01 into 0xFF for the entire byte.
+		 * mask will have 0xFF where the pixel was NOT blue, and 0x00 where it WAS blue. */
+		uint32_t mask = c_or * 255; 
+		
+		/* Apply the new hue */
+		uint32_t new_px = (s & 0x0F0F0F0F) | hue32;
+		
+		/* Blend using the mask: keep original if mask=0, use new if mask=0xFF */
+		*d32++ = (s & ~mask) | (new_px & mask);
+	}
+}
+
+static void original_water_filter(SDL_Surface *dst, SDL_Surface *src)
+{
 	Uint8 hue = smoothie_data[1] << 4;
-	
-	/* we don't need to check for over-reading the pixel surfaces since we only
-	 * read from the top 185+1 scanlines, and there should be 320 */
-	
 	const int dst_pitch = dst->pitch;
 	Uint8 *dst_pixel = (Uint8 *)dst->pixels + (185 * dst_pitch);
-	
 	const Uint8 *src_pixel = (Uint8 *)src->pixels + (185 * src->pitch);
-	
 	int w = 320 * 185 - 1;
 	
 	for (int y = 185 - 1; y >= 0; --y)
 	{
-		dst_pixel -= (dst_pitch - 320);  // in case pitch is not 320
-		src_pixel -= (src->pitch - 320);  // in case pitch is not 320
+		dst_pixel -= (dst_pitch - 320);
+		src_pixel -= (src->pitch - 320);
 		
 		for (int x = 320 - 1; x >= 0; x -= 8)
 		{
@@ -396,8 +448,6 @@ void water_filter(SDL_Surface *dst, SDL_Surface *src)
 				--dst_pixel;
 				--src_pixel;
 				
-				// pixel is copied from source if not blue
-				// otherwise, value is average of value of source pixel and destination pixel below (with waver)
 				if ((*src_pixel & 0x30) == 0)
 				{
 					*dst_pixel = *src_pixel;
@@ -413,10 +463,38 @@ void water_filter(SDL_Surface *dst, SDL_Surface *src)
 	}
 }
 
-void iced_blur_filter(SDL_Surface *dst, SDL_Surface *src)
+void water_filter(SDL_Surface *dst, SDL_Surface *src)
 {
 	assert(src->format->BitsPerPixel == 8 && dst->format->BitsPerPixel == 8);
+	original_water_filter(dst, src);
+}
+
+__attribute__((section(".fasttext")))
+static void fast_iced_blur_filter(SDL_Surface *dst, SDL_Surface *src)
+{
+	uint32_t *d32 = (uint32_t *)dst->pixels;
+	const uint32_t *s32 = (const uint32_t *)src->pixels;
+	int n = (320 * 184) / 4;
 	
+	while (n >= 4) {
+		uint32_t s0 = s32[0], d0 = d32[0];
+		uint32_t s1 = s32[1], d1 = d32[1];
+		uint32_t s2 = s32[2], d2 = d32[2];
+		uint32_t s3 = s32[3], d3 = d32[3];
+		d32[0] = ((((s0 & 0x0F0F0F0F) + (d0 & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | 0x80808080;
+		d32[1] = ((((s1 & 0x0F0F0F0F) + (d1 & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | 0x80808080;
+		d32[2] = ((((s2 & 0x0F0F0F0F) + (d2 & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | 0x80808080;
+		d32[3] = ((((s3 & 0x0F0F0F0F) + (d3 & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | 0x80808080;
+		s32 += 4; d32 += 4; n -= 4;
+	}
+	while (n--) {
+		uint32_t s = *s32++, d = *d32;
+		*d32++ = ((((s & 0x0F0F0F0F) + (d & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | 0x80808080;
+	}
+}
+
+static void original_iced_blur_filter(SDL_Surface *dst, SDL_Surface *src)
+{
 	Uint8 *dst_pixel = dst->pixels;
 	const Uint8 *src_pixel = src->pixels;
 	
@@ -424,9 +502,6 @@ void iced_blur_filter(SDL_Surface *dst, SDL_Surface *src)
 	{
 		for (int x = 0; x < 320; ++x)
 		{
-			// value is average value of source pixel and destination pixel
-			// hue is icy blue
-			
 			const Uint8 value = (*src_pixel & 0x0f) + (*dst_pixel & 0x0f);
 			*dst_pixel = (value / 2) | 0x80;
 			
@@ -434,15 +509,46 @@ void iced_blur_filter(SDL_Surface *dst, SDL_Surface *src)
 			++src_pixel;
 		}
 		
-		dst_pixel += (dst->pitch - 320);  // in case pitch is not 320
-		src_pixel += (src->pitch - 320);  // in case pitch is not 320
+		dst_pixel += (dst->pitch - 320);
+		src_pixel += (src->pitch - 320);
 	}
 }
 
-void blur_filter(SDL_Surface *dst, SDL_Surface *src)
+void iced_blur_filter(SDL_Surface *dst, SDL_Surface *src)
 {
 	assert(src->format->BitsPerPixel == 8 && dst->format->BitsPerPixel == 8);
+	if (processorType == 5)
+		fast_iced_blur_filter(dst, src);
+	else
+		original_iced_blur_filter(dst, src);
+}
+
+__attribute__((section(".fasttext")))
+static void fast_blur_filter(SDL_Surface *dst, SDL_Surface *src)
+{
+	uint32_t *d32 = (uint32_t *)dst->pixels;
+	const uint32_t *s32 = (const uint32_t *)src->pixels;
+	int n = (320 * 184) / 4;
 	
+	while (n >= 4) {
+		uint32_t s0 = s32[0], d0 = d32[0];
+		uint32_t s1 = s32[1], d1 = d32[1];
+		uint32_t s2 = s32[2], d2 = d32[2];
+		uint32_t s3 = s32[3], d3 = d32[3];
+		d32[0] = ((((s0 & 0x0F0F0F0F) + (d0 & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | (s0 & 0xF0F0F0F0);
+		d32[1] = ((((s1 & 0x0F0F0F0F) + (d1 & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | (s1 & 0xF0F0F0F0);
+		d32[2] = ((((s2 & 0x0F0F0F0F) + (d2 & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | (s2 & 0xF0F0F0F0);
+		d32[3] = ((((s3 & 0x0F0F0F0F) + (d3 & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | (s3 & 0xF0F0F0F0);
+		s32 += 4; d32 += 4; n -= 4;
+	}
+	while (n--) {
+		uint32_t s = *s32++, d = *d32;
+		*d32++ = ((((s & 0x0F0F0F0F) + (d & 0x0F0F0F0F)) >> 1) & 0x0F0F0F0F) | (s & 0xF0F0F0F0);
+	}
+}
+
+static void original_blur_filter(SDL_Surface *dst, SDL_Surface *src)
+{
 	Uint8 *dst_pixel = dst->pixels;
 	const Uint8 *src_pixel = src->pixels;
 	
@@ -450,9 +556,6 @@ void blur_filter(SDL_Surface *dst, SDL_Surface *src)
 	{
 		for (int x = 0; x < 320; ++x)
 		{
-			// value is average value of source pixel and destination pixel
-			// hue is source pixel hue
-			
 			const Uint8 value = (*src_pixel & 0x0f) + (*dst_pixel & 0x0f);
 			*dst_pixel = (value / 2) | (*src_pixel & 0xf0);
 			
@@ -460,9 +563,18 @@ void blur_filter(SDL_Surface *dst, SDL_Surface *src)
 			++src_pixel;
 		}
 		
-		dst_pixel += (dst->pitch - 320);  // in case pitch is not 320
-		src_pixel += (src->pitch - 320);  // in case pitch is not 320
+		dst_pixel += (dst->pitch - 320);
+		src_pixel += (src->pitch - 320);
 	}
+}
+
+void blur_filter(SDL_Surface *dst, SDL_Surface *src)
+{
+	assert(src->format->BitsPerPixel == 8 && dst->format->BitsPerPixel == 8);
+	if (processorType == 5)
+		fast_blur_filter(dst, src);
+	else
+		original_blur_filter(dst, src);
 }
 
 /* Background Starfield */

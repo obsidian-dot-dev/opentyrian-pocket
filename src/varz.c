@@ -197,7 +197,9 @@ JE_word curLoc; /*Current Pixel location of background 1*/
 JE_boolean firstGameOver, gameLoaded, enemyStillExploding;
 
 /* Destruction Ratio */
+__attribute__((section(".fastbss")))
 JE_word totalEnemy;
+__attribute__((section(".fastbss")))
 JE_word enemyKilled;
 
 /* Shape/Map Data - All in one Segment! */
@@ -254,9 +256,13 @@ JE_boolean skipStarShowVGA;
 
 /*EnemyData*/
 JE_MultiEnemyType enemy;
+__attribute__((section(".fastbss")))
 JE_EnemyAvailType enemyAvail;  /* values: 0: used, 1: free, 2: secret pick-up */
+__attribute__((section(".fastbss")))
 JE_word enemyOffset;
+__attribute__((section(".fastbss")))
 JE_word enemyOnScreen;
+__attribute__((section(".fastbss")))
 JE_word superEnemy254Jump;
 
 /*EnemyShotData*/
@@ -265,9 +271,13 @@ JE_boolean enemyShotAvail[ENEMY_SHOT_MAX]; /* [1..Enemyshotmax] */
 EnemyShotType enemyShot[ENEMY_SHOT_MAX]; /* [1..Enemyshotmax]  */
 
 /* Player Shot Data */
+__attribute__((section(".fastbss")))
 JE_byte     zinglonDuration;
+__attribute__((section(".fastbss")))
 JE_byte     astralDuration;
+__attribute__((section(".fastbss")))
 JE_word     flareDuration;
+__attribute__((section(".fastbss")))
 JE_boolean  flareStart;
 JE_shortint flareColChg;
 JE_byte     specialWait;
@@ -292,6 +302,7 @@ JE_word neat;
 
 /*ExplosionData*/
 Explosion explosions[MAX_EXPLOSIONS]; /* [1..ExplosionMax] */
+__attribute__((section(".fastbss")))
 JE_integer explosionFollowAmountX, explosionFollowAmountY;
 
 /*Repeating Explosions*/

@@ -25,6 +25,7 @@
 
 // I'm pretty sure the last extra entry is never used.
 PlayerShotDataType playerShotData[MAX_PWEAPON + 1]; /* [1..MaxPWeapon+1] */
+__attribute__((section(".fastbss")))
 JE_byte shotAvail[MAX_PWEAPON]; /* [1..MaxPWeapon] */   /*0:Avail 1-255:Duration left*/
 
 void simulate_player_shots(void)

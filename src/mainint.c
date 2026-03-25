@@ -57,21 +57,32 @@
 #include <ctype.h>
 #include <string.h>
 
+__attribute__((section(".fastbss")))
 bool button[4];
 
 #define MAX_PAGE 8
 #define TOPICS 6
 const JE_byte topicStart[TOPICS] = { 0, 1, 2, 3, 7, 255 };
 
+__attribute__((section(".fastbss")))
 JE_shortint constantLastX;
+__attribute__((section(".fastbss")))
 JE_word textErase;
+__attribute__((section(".fastbss")))
 JE_word upgradeCost;
+__attribute__((section(".fastbss")))
 JE_word downgradeCost;
+__attribute__((section(".fastbss")))
 JE_boolean performSave;
+__attribute__((section(".fastbss")))
 JE_boolean jumpSection;
+__attribute__((section(".fastbss")))
 JE_boolean useLastBank; /* See if I want to use the last 16 colors for DisplayText */
 
-bool pause_pressed = false, ingamemenu_pressed = false;
+__attribute__((section(".fastbss")))
+bool pause_pressed = false;
+__attribute__((section(".fastbss")))
+bool ingamemenu_pressed = false;
 
 /* Draws a message at the bottom text window on the playing screen */
 void JE_drawTextWindow(const char *text)
@@ -1807,7 +1818,7 @@ JE_boolean JE_inGameSetup(void)
 			{
 				JE_playSampleNum(S_CURSOR);
 
-				processorType = processorType > 1 ? processorType - 1 : 4;
+				processorType = processorType > 1 ? processorType - 1 : 5;
 				JE_initProcessorType();
 				JE_setNewGameSpeed();
 				break;
@@ -1847,7 +1858,7 @@ JE_boolean JE_inGameSetup(void)
 			{
 				JE_playSampleNum(S_CURSOR);
 
-				processorType = processorType < 4 ? processorType + 1 : 1;
+				processorType = processorType < 5 ? processorType + 1 : 1;
 				JE_initProcessorType();
 				JE_setNewGameSpeed();
 				break;
@@ -2334,7 +2345,8 @@ void JE_playCredits(void)
 	enum { lines_max = 131 };
 	enum { line_max_length = 65 };
 
-	char credstr[lines_max][line_max_length + 1];
+	char (*credstr)[line_max_length + 1] = malloc(lines_max * (line_max_length + 1));
+	if (!credstr) return;
 
 	int lines = 0;
 
@@ -2489,12 +2501,16 @@ void JE_playCredits(void)
 		wait_delay();
 
 		if (JE_anyButton())
+		{
+			free(credstr);
 			break;
+		}
 	}
 
 	fade_black(10);
 
 	free_sprites(EXTRA_SHAPES);
+	free(credstr);
 }
 
 void JE_endLevelAni(void)

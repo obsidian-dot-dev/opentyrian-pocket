@@ -262,6 +262,9 @@ void JE_loadHelpText(void)
 	skip_pascal_string(f);
 	for (unsigned int i = 0; i < COUNTOF(detailLevel); ++i)
 		read_encrypted_pascal_string(detailLevel[i], sizeof(detailLevel[i]), f);
+#ifdef POCKET_TYRIAN
+	snprintf(detailLevel[4], sizeof(detailLevel[4]), "Pocket");
+#endif
 	skip_pascal_string(f);
 
 	/*Game speed text*/

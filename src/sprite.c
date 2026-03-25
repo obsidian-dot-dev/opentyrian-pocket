@@ -26,21 +26,32 @@
 #include <ctype.h>
 #include <stdlib.h>
 
+__attribute__((section(".fastbss")))
 Sprite_array sprite_table[SPRITE_TABLES_MAX];
 
+__attribute__((section(".fastbss")))
 Sprite2_array shopSpriteSheet;
 
+__attribute__((section(".fastbss")))
 Sprite2_array explosionSpriteSheet;
 
+__attribute__((section(".fastbss")))
 Sprite2_array enemySpriteSheets[4];
+__attribute__((section(".fastbss")))
 Uint8 enemySpriteSheetIds[4];
 
+__attribute__((section(".fastbss")))
 Sprite2_array destructSpriteSheet;
 
+__attribute__((section(".fastbss")))
 Sprite2_array spriteSheet8;
+__attribute__((section(".fastbss")))
 Sprite2_array spriteSheet9;
+__attribute__((section(".fastbss")))
 Sprite2_array spriteSheet10;
+__attribute__((section(".fastbss")))
 Sprite2_array spriteSheet11;
+__attribute__((section(".fastbss")))
 Sprite2_array spriteSheet12;
 
 void load_sprites_file(unsigned int table, const char *filename)
@@ -102,6 +113,7 @@ void free_sprites(unsigned int table)
 }
 
 // does not clip on left or right edges of surface
+__attribute__((section(".fasttext")))
 void blit_sprite(SDL_Surface *surface, int x, int y, unsigned int table, unsigned int index)
 {
 	if (index >= sprite_table[table].count || !sprite_exists(table, index))
@@ -514,6 +526,7 @@ void free_sprite2s(Sprite2_array *sprite2s)
 }
 
 // does not clip on left or right edges of surface
+__attribute__((section(".fasttext")))
 void blit_sprite2(SDL_Surface *surface, int x, int y, Sprite2_array sprite2s, unsigned int index)
 {
 	assert(surface->format->BitsPerPixel == 8);
@@ -549,6 +562,7 @@ void blit_sprite2(SDL_Surface *surface, int x, int y, Sprite2_array sprite2s, un
 	}
 }
 
+__attribute__((section(".fasttext")))
 void blit_sprite2_clip(SDL_Surface *surface, int x, int y, Sprite2_array sprite2s, unsigned int index)
 {
 	assert(surface->format->BitsPerPixel == 8);
@@ -591,6 +605,7 @@ void blit_sprite2_clip(SDL_Surface *surface, int x, int y, Sprite2_array sprite2
 }
 
 // does not clip on left or right edges of surface
+__attribute__((section(".fasttext")))
 void blit_sprite2_blend(SDL_Surface *surface,  int x, int y, Sprite2_array sprite2s, unsigned int index)
 {
 	assert(surface->format->BitsPerPixel == 8);

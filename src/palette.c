@@ -32,9 +32,12 @@ static Uint32 rgb_to_yuv(int r, int g, int b);
 Palette palettes[PALETTE_COUNT];
 int palette_count;
 
+__attribute__((section(".fastbss")))
 Palette palette;
+__attribute__((section(".fastbss")))
 Uint32 rgb_palette[256], yuv_palette[256];
 
+__attribute__((section(".fastbss")))
 Palette colors;
 
 void JE_loadPals(void)

@@ -498,8 +498,9 @@ void JE_initProcessorType(void)
 			wild = true;
 			filtrationAvail = true;
 			break;
-		case 5: /* Nonstandard VGA */
-			smoothScroll = false;
+		case 5: /* Pocket (Fast Pentium) */
+			wild = true;
+			filtrationAvail = true;
 			break;
 		case 6: /* SuperWild */
 			wild = true;
@@ -783,7 +784,7 @@ void JE_loadConfiguration(void)
 		tyrMusicVolume = 191;
 		fxVolume = 191;
 		gammaCorrection = 0;
-		processorType = 2;
+		processorType = 5;
 		gameSpeed = 4;
 		pentiumMode = false;
 	}

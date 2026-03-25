@@ -96,34 +96,48 @@ void SZ_Memcpy2(sizebuf_t * sz, sizebuf_t * bf, size_t count)
 /* Reposition buffer pointer */
 void SZ_Seek(sizebuf_t * sz, long count, int mode)
 {
-	/* Okay, it's reasonable to reset the error bool on seeking... */
+	if (sz->error)
+		return;
+
+	unsigned int new_pos;
 
 	switch (mode)
 	{
 		case SEEK_SET:
-			sz->bufferPos = count;
+			new_pos = (unsigned int)count;
 			break;
 		case SEEK_CUR:
-			sz->bufferPos += count;
+			new_pos = sz->bufferPos + count;
 			break;
 		case SEEK_END:
-			sz->bufferPos = sz->bufferLen - count;
+			new_pos = sz->bufferLen - count;
 			break;
 		default:
 			assert(false);
+			return;
 	}
 
 	/* Check errors */
-	if (sz->bufferPos > sz->bufferLen)
+	if (new_pos > sz->bufferLen)
 		sz->error = true;
 	else
+	{
+		sz->bufferPos = new_pos;
 		sz->error = false;
+	}
 }
 
-/* The code below makes use of pointer casts, similar to what is in efread.
- * It's not the ONLY way to write ints to a stream, but it's probably the
- * cleanest of the lot.  Better to have it here than littered all over the code.
- */
+/* Helper to read a byte from a buffer using word-aligned access to avoid traps */
+static inline uint8_t internal_read_byte(const uint8_t *data, uint32_t pos)
+{
+	uint32_t addr = (uint32_t)(data + pos);
+	uint32_t aligned_addr = addr & ~3;
+	uint32_t val = *(const volatile uint32_t *)aligned_addr;
+	int shift = (addr & 3) * 8;
+	return (uint8_t)(val >> shift);
+}
+
+/* The code below makes use of trap-free word-aligned loads to improve performance. */
 unsigned int MSG_ReadByte(sizebuf_t * sz)
 {
 	unsigned int ret;
@@ -134,7 +148,7 @@ unsigned int MSG_ReadByte(sizebuf_t * sz)
 		return 0;
 	}
 
-	ret = sz->data[sz->bufferPos];
+	ret = internal_read_byte(sz->data, sz->bufferPos);
 	sz->bufferPos += 1;
 
 	return ret;
@@ -150,7 +164,11 @@ unsigned int MSG_ReadWord(sizebuf_t * sz)
 		return 0;
 	}
 
-	ret = SDL_SwapLE16(*((Uint16 *)(sz->data + sz->bufferPos)));
+	/* Read two bytes individually using trap-free helper to avoid misaligned or byte traps */
+	uint8_t b0 = internal_read_byte(sz->data, sz->bufferPos);
+	uint8_t b1 = internal_read_byte(sz->data, sz->bufferPos + 1);
+	
+	ret = b0 | (b1 << 8);
 	sz->bufferPos += 2;
 
 	return ret;

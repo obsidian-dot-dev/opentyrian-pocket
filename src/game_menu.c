@@ -187,7 +187,7 @@ void JE_itemScreen(void)
 
 	curMenu = MENU_FULL_GAME;
 
-	int temp_weapon_power[7]; // assumes there'll never be more than 6 weapons to choose from, 7th is "Done"
+	int temp_weapon_power[21]; // assumes there'll never be more than 20 weapons to choose from, 21st is "Done"
 
 	/* JE: (* Check for where Pitems and Select match up - if no match then add to the itemavail list *) */
 	for (int i = 0; i < 7; i++)
@@ -206,6 +206,22 @@ void JE_itemScreen(void)
 		{
 			itemAvail[itemAvailMap[i]-1][slot] = item;
 			itemAvailMax[itemAvailMap[i]-1]++;
+		}
+	}
+
+	// Manually add special weapon (category 5, index 4) if not already present
+	{
+		int item = player[0].last_items.special;
+		int slot = 0;
+		for (; slot < itemAvailMax[4]; ++slot)
+		{
+			if (itemAvail[4][slot] == item)
+				break;
+		}
+		if (slot == itemAvailMax[4] && itemAvailMax[4] < 20)
+		{
+			itemAvail[4][slot] = item;
+			itemAvailMax[4]++;
 		}
 	}
 
