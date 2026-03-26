@@ -73,6 +73,7 @@ char tempStr[31];
 /* Data used for ItemScreen procedure to indicate items available */
 JE_byte itemAvail[9][20]; /* [1..9, 1..20] */
 JE_byte itemAvailMax[9]; /* [1..9] */
+bool isSmuggled;
 
 void JE_starShowVGA(void)
 {
@@ -3376,6 +3377,7 @@ bool JE_cheatMenu(void)
 												fade_black(10);
 												if (modeIdx == 0) // Full Game
 												{
+													// Smuggle the ship/weapons BEFORE selecting episode
 													player[0].items.ship = SAShip[shipIdx];
 													player[0].items.weapon[FRONT_WEAPON].id = SAWeapon[shipIdx][0];
 													player[0].items.weapon[REAR_WEAPON].id = 0;
@@ -3383,13 +3385,41 @@ bool JE_cheatMenu(void)
 													
 													if (SAShip[shipIdx] == 12) // NortShip Z
 													{
-														player[0].items.weapon[REAR_WEAPON].id = 37;
 														player[0].items.weapon[FRONT_WEAPON].id = 36;
+														player[0].items.weapon[REAR_WEAPON].id = 37;
 														for (uint i = 0; i < COUNTOF(player[0].items.sidekick); ++i)
 															player[0].items.sidekick[i] = 24; // Companion Ship Quicksilver
+														player[0].items.special = 13;
 													}
-													
-													if (newGame(true)) return true;
+
+													if (episodeSelect() && difficultySelect())
+													{
+														initial_episode_num = episodeNum;
+														JE_initEpisode(episodeNum);
+														mainLevel = FIRST_LEVEL;
+														saveLevel = FIRST_LEVEL;
+														superArcadeMode = SA_NONE;
+														
+														if (richMode)
+															player[0].cash = 1000000;
+														else
+														{
+															const ulong initial_cash[] = { 10000, 15000, 20000, 30000 };
+															player[0].cash = initial_cash[episodeNum - 1];
+														}
+														
+														// Ensure weapons have at least power 1
+														player[0].items.weapon[FRONT_WEAPON].power = 1;
+														if (player[0].items.weapon[REAR_WEAPON].id != 0)
+															player[0].items.weapon[REAR_WEAPON].power = 1;
+
+														player[0].last_items = player[0].items;
+														gameLoaded = true;
+														onePlayerAction = false;
+														twoPlayerMode = false;
+														
+														if (newGame(true)) return true;
+													}
 												}
 												else // Arcade Mode
 												{
@@ -3696,6 +3726,7 @@ bool titleScreen(void)
 
 bool newGame(bool bypass_select)
 {
+	isSmuggled = bypass_select;
 	if (bypass_select || gameplaySelect())
 	{
 		if (bypass_select || (episodeSelect() && difficultySelect()))

@@ -93,6 +93,7 @@ typedef struct
 	JE_byte       input2;
 	JE_boolean    gameHasRepeated; /*See if you went from one episode to another*/
 	JE_byte       initialDifficulty;
+	JE_boolean    isSmuggled;
 
 	/* High Scores - Each episode has both sets of 1&2 player selections - with 3 in each */
 	JE_longint    highScore1;

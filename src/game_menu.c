@@ -209,6 +209,57 @@ void JE_itemScreen(void)
 		}
 	}
 
+	// Smuggle arcade weapons if using a secret ship and explicitly smuggled from cheat menu
+	if (isSmuggled)
+	{
+		for (int sIdx = 0; sIdx < SA; sIdx++)
+		{
+			if (SAShip[sIdx] == player[0].items.ship)
+			{
+				// Add all weapons from this ship's arcade row to Front Weapons (category 2, index 1)
+				for (int wIdx = 0; wIdx < 5; wIdx++)
+				{
+					int item = SAWeapon[sIdx][wIdx];
+					if (item == 0) continue;
+
+					int slot = 0;
+					for (; slot < itemAvailMax[1]; ++slot)
+					{
+						if (itemAvail[1][slot] == item)
+							break;
+					}
+					if (slot == itemAvailMax[1] && itemAvailMax[1] < 20)
+					{
+						itemAvail[1][slot] = item;
+						itemAvailMax[1]++;
+					}
+				}
+				
+				// Also add the two arcade special weapons to the shop (Special category if possible, or just Front)
+				// Let's put them in Front Weapon category too so they are upgradeable!
+				int specials[2] = { SASpecialWeapon[sIdx], SASpecialWeaponB[sIdx] };
+				for (int wIdx = 0; wIdx < 2; wIdx++)
+				{
+					int item = specials[wIdx];
+					if (item == 0) continue;
+
+					int slot = 0;
+					for (; slot < itemAvailMax[1]; ++slot)
+					{
+						if (itemAvail[1][slot] == item)
+							break;
+					}
+					if (slot == itemAvailMax[1] && itemAvailMax[1] < 20)
+					{
+						itemAvail[1][slot] = item;
+						itemAvailMax[1]++;
+					}
+				}
+				break;
+			}
+		}
+	}
+
 	// Manually add special weapon (category 5, index 4) if not already present
 	{
 		int item = player[0].last_items.special;

@@ -38,6 +38,7 @@ extern boss_bar_t boss_bar[2];
 
 extern char tempStr[31];
 extern JE_byte itemAvail[9][20], itemAvailMax[9];
+extern bool isSmuggled;
 
 void JE_createNewEventEnemy(JE_byte enemytypeofs, JE_word enemyoffset, Sint16 uniqueShapeTableI);
 

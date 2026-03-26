@@ -26,6 +26,7 @@
 #include "nortsong.h"
 #include "opentyr.h"
 #include "player.h"
+#include "tyrian2.h"
 #include "varz.h"
 #include "vga256d.h"
 #include "video.h"
@@ -339,6 +340,7 @@ static void pitems_to_playeritems(PlayerItems *items, JE_PItemsType pItems, JE_b
 void JE_saveGame(JE_byte slot, const char *name)
 {
 	saveFiles[slot-1].initialDifficulty = initialDifficulty;
+	saveFiles[slot-1].isSmuggled = isSmuggled;
 	saveFiles[slot-1].gameHasRepeated = gameHasRepeated;
 	saveFiles[slot-1].level = saveLevel;
 	
@@ -401,6 +403,7 @@ void JE_loadGame(JE_byte slot)
 	galagaMode = false;
 
 	initialDifficulty = saveFiles[slot-1].initialDifficulty;
+	isSmuggled        = saveFiles[slot-1].isSmuggled;
 	gameHasRepeated   = saveFiles[slot-1].gameHasRepeated;
 	twoPlayerMode     = (slot-1) > 10;
 	difficultyLevel   = saveFiles[slot-1].difficulty;
@@ -850,9 +853,11 @@ void JE_loadConfiguration(void)
 			memcpy(&saveFiles[z].input2, p, sizeof(JE_byte)); p++;
 			
 			/* booleans were 1 byte in pascal -- working around it */
+			/* SYN: Unpacking isSmuggled from bit 1 of the gameHasRepeated byte */
 			Uint8 temp;
 			memcpy(&temp, p, 1); p++;
-			saveFiles[z].gameHasRepeated = temp != 0;
+			saveFiles[z].gameHasRepeated = (temp & 1) != 0;
+			saveFiles[z].isSmuggled      = (temp & 2) != 0;
 			
 			memcpy(&saveFiles[z].initialDifficulty, p, sizeof(JE_byte)); p++;
 			
@@ -962,7 +967,8 @@ void JE_saveConfiguration(void)
 		memcpy(p, &tempSaveFile.input2, sizeof(JE_byte)); p++;
 		
 		/* booleans were 1 byte in pascal -- working around it */
-		Uint8 temp = tempSaveFile.gameHasRepeated != false;
+		/* SYN: Packing isSmuggled into bit 1 of the gameHasRepeated byte to preserve file layout */
+		Uint8 temp = (tempSaveFile.gameHasRepeated ? 1 : 0) | (tempSaveFile.isSmuggled ? 2 : 0);
 		memcpy(p, &temp, 1); p++;
 		
 		memcpy(p, &tempSaveFile.initialDifficulty, sizeof(JE_byte)); p++;
