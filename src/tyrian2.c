@@ -3254,12 +3254,13 @@ void networkStartScreen(void)
 
 bool JE_cheatMenu(void)
 {
-	const size_t cheat_count = 8;
+	const size_t cheat_count = 9;
 	const char *cheat_text[] = {
 		"Invincibility",
 		"Rich Mode",
 		"Constant Play",
 		"XMas Mode",
+		"Unlock Difficulties",
 		"Start SuperTyrian",
 		"Arcade Ships",
 		"Nort Ship",
@@ -3292,6 +3293,7 @@ bool JE_cheatMenu(void)
 			else if (i == 1) status = richMode ? " (ON)" : " (OFF)";
 			else if (i == 2) status = constantPlay ? " (ON)" : " (OFF)";
 			else if (i == 3) status = xmas ? " (ON)" : " (OFF)";
+			else if (i == 4) status = unlockDifficulties ? " (ON)" : " (OFF)";
 
 			snprintf(buffer, sizeof(buffer), "%s%s", cheat_text[i], status);
 			
@@ -3324,11 +3326,12 @@ bool JE_cheatMenu(void)
 				case 1: richMode = !richMode; break;
 				case 2: constantPlay = !constantPlay; break;
 				case 3: xmas = !xmas; break;
-				case 4: // SuperTyrian
+				case 4: unlockDifficulties = !unlockDifficulties; break;
+				case 5: // SuperTyrian
 					fade_black(10);
 					newSuperTyrianGame();
 					return true;
-				case 5: // Arcade Ships Sub-menu
+				case 6: // Arcade Ships Sub-menu
 					{
 						size_t shipIdx = 0;
 						bool ship_done = false;
@@ -3438,14 +3441,14 @@ bool JE_cheatMenu(void)
 						}
 					}
 					break;
-				case 6: // Nort Ship (instantly)
+				case 7: // Nort Ship (instantly)
 					player[0].items.ship = 12;
 					player[0].items.special = 13;
 					player[0].items.weapon[FRONT_WEAPON].id = 36;
 					player[0].items.weapon[REAR_WEAPON].id = 37;
 					shipGr = 1;
 					break;
-				case 7: return false; // Back
+				case 8: return false; // Back
 				}
 				break;
 			case SDL_SCANCODE_ESCAPE:
@@ -3760,8 +3763,6 @@ bool newGame(bool bypass_select)
 		}
 		else if (gameLoaded)
 		{
-			// allows player to smuggle arcade/super-arcade ships into full game
-
 			const ulong initial_cash[] = { 10000, 15000, 20000, 30000 };
 
 			assert(episodeNum >= 1 && episodeNum <= EPISODE_AVAILABLE);

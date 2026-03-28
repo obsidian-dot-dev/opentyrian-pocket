@@ -317,6 +317,7 @@ JE_byte temp, temp2, temp3;
 JE_word tempW;
 
 JE_boolean doNotSaveBackup;
+JE_boolean unlockDifficulties;
 
 JE_word x, y;
 JE_integer b;

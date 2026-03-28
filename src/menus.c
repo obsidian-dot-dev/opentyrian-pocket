@@ -29,9 +29,10 @@
 #include "nortsong.h"
 #include "opentyr.h"
 #include "palette.h"
+#include "varz.h"
+#include "vga256d.h"
 #include "picload.h"
 #include "sprite.h"
-#include "vga256d.h"
 #include "video.h"
 
 char episode_name[6][31];
@@ -505,6 +506,9 @@ bool difficultySelect(void)
 		} while (!(newkey || newmouse || mouseMoved));
 
 		// Handle interaction.
+
+		if (unlockDifficulties)
+			menuItemsVisibleCount = menuItemsCount;
 
 		if (menuItemsVisibleCount == 5)
 		{
